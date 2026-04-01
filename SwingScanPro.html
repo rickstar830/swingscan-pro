@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SwingScan Pro</title>
+    <style>
+        :root {
+            --bg: #0a0e1a;
+            --card: #121826;
+            --border: #1f2a44;
+            --text: #e0f0ff;
+            --sub: #6b8cc1;
+            --accent: #00d4aa;
+            --bull: #00ff9d;
+            --bear: #ff4d6d;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 440px;
+            margin: 0 auto;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        header {
+            background: rgba(18, 24, 38, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            margin: 12px;
+        }
+        button {
+            background: var(--accent);
+            color: #000;
+            font-weight: 600;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .pill {
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .strong-buy { background: #00d4aa; color: #000; }
+        .buy { background: #4ade80; color: #000; }
+        .hold { background: #fbbf24; color: #000; }
+        .watch { background: #60a5fa; color: #fff; }
+        .progress-container {
+            height: 6px;
+            background: var(--border);
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #4ade80);
+            transition: width 0.3s;
+        }
+        .toast {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            z-index: 1000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="title">SwingScan Pro</div>
+        <div style="font-size:12px;color:var(--sub);">Real Data • Swing Scanner</div>
+    </header>
+
+    <div id="main" class="card">
+        <h3>Dashboard</h3>
+        <p style="margin:16px 0;color:var(--sub);">Tap SCAN to start finding swing setups.</p>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<nav style="position:fixed;bottom:0;left:0;right:0;max-width:440px;margin:0 auto;background:rgba(18,24,38,0.98);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 0;">
+    <button onclick="switchTab(0)" style="flex:1;background:none;color:var(--text);font-size:11px;">DASH</button>
+    <button onclick="switchTab(1)" style="flex:1;background:none;color:var(--text);font-size:11px;">SCAN</button>
+    <button onclick="switchTab(2)" style="flex:1;background:none;color:var(--text);font-size:11px;">RESULTS</button>
+    <button onclick="switchTab(3)" style="flex:1;background:none;color:var(--text);font-size:11px;">SETTINGS</button>
+</nav>
+
+<script>
+let apiKey = localStorage.getItem('fh_key') || '';
+let stocks = [];
+
+const TOP_SYMBOLS = ["NVDA","TSLA","AAPL","MSFT","AMZN","GOOGL","META","AVGO","AMD","PLTR"];
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+
+async function fetchQuote(sym) {
+    if (!apiKey) return null;
+    const url = `https://finnhub.io/api/v1/quote?symbol=${sym}&token=${apiKey}`;
+    try {
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.c || data.pc) return data;
+        }
+    } catch(e) {}
+    return null;
+}
+
+async function runScan() {
+    const main = document.getElementById('main');
+    main.innerHTML = `<p style="text-align:center;padding:40px;">Scanning Top 10 stocks...</p>`;
+
+    stocks = [];
+    for (let sym of TOP_SYMBOLS) {
+        let q = await fetchQuote(sym);
+        if (q) {
+            const price = q.c > 0 ? q.c : q.pc || 0;
+            const change = q.dp || 0;
+            stocks.push({sym, price, change});
+        }
+    }
+
+    let html = `<h3>Results (${stocks.length})</h3>`;
+    if (stocks.length === 0) {
+        html += `<p style="color:#ff4d6d;padding:30px;text-align:center;">No data returned.<br>Check your Finnhub key and try again.</p>`;
+    } else {
+        stocks.forEach(s => {
+            html += `<div style="padding:12px 0;border-bottom:1px solid #1f2a44;display:flex;justify-content:space-between;">
+                <div><strong>${s.sym}</strong></div>
+                <div>$${s.price.toFixed(2)} <span style="color:${s.change >= 0 ? '#00ff9d' : '#ff4d6d'}">${s.change.toFixed(1)}%</span></div>
+            </div>`;
+        });
+    }
+    main.innerHTML = html;
+}
+
+function switchTab(n) {
+    const main = document.getElementById('main');
+    if (n === 0) {
+        main.innerHTML = `<h3>Dashboard</h3><p style="margin:16px 0;color:var(--sub);">Tap SCAN to find swing setups.</p>`;
+    } else if (n === 1) {
+        main.innerHTML = `<button onclick="runScan()" style="width:100%;padding:16px;">Run Quick Scan (Top 10)</button>`;
+    } else if (n === 3) {
+        main.innerHTML = `
+            <h3>Settings</h3>
+            <input id="key" value="${apiKey}" placeholder="Finnhub API Key" style="width:100%;padding:12px;background:#1f2a44;border:1px solid #1f2a44;border-radius:8px;color:white;margin:12px 0;">
+            <button onclick="saveKey()">Save Key</button>`;
+    } else {
+        main.innerHTML = `<h3>Results</h3><p>No results yet.</p>`;
+    }
+}
+
+function saveKey() {
+    apiKey = document.getElementById('key').value.trim();
+    localStorage.setItem('fh_key', apiKey);
+    showToast('Key saved');
+}
+
+window.onload = () => switchTab(0);
+</script>
+</body>
+</html>
